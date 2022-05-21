@@ -1,0 +1,106 @@
+From 4b2107f3a0d96d985a96930c47d9bce2f44a8d14 Mon Sep 17 00:00:00 2001
+From: Jens Renner <renner@efe-gmbh.de>
+Date: Wed, 8 Dec 2021 11:22:59 +0100
+Subject: [PATCH] clk: si5351: update multisynth limits
+
+The revised datasheet (rev. 1.0 and later) specifies new limits for the
+multisynth dividers that lead to an extended clock output frequency
+range of 2.5 kHz - 200 MHz [1].
+
+[1] https://www.skyworksinc.com/-/media/Skyworks/SL/documents/public
+/data-sheets/Si5351-B.pdf
+
+Signed-off-by: Jens Renner <renner@efe-gmbh.de>
+---
+ drivers/clk/clk-si5351.c | 15 ++++++++-------
+ drivers/clk/clk-si5351.h |  8 ++++----
+ 2 files changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 93fa8c9e1..80c493019 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -556,7 +556,7 @@ static const struct clk_ops si5351_pll_ops = {
+  * MS[6,7] are integer (P1) divide only, P1 = divide value,
+  * P2 and P3 are not applicable
+  *
+- * for 150MHz < fOUT <= 160MHz:
++ * for 150MHz < fOUT <= 200MHz:
+  *
+  * MSx_P1 = 0, MSx_P2 = 0, MSx_P3 = 1, MSx_INT = 1, MSx_DIVBY4 = 11b
+  */
+@@ -653,7 +653,7 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (hwdata->num >= 6 && rate > SI5351_MULTISYNTH67_MAX_FREQ)
+ 		rate = SI5351_MULTISYNTH67_MAX_FREQ;
+ 
+-	/* multisync frequency is 1MHz .. 160MHz */
++	/* multisync frequency is 300kHz .. 200MHz */
+ 	if (rate > SI5351_MULTISYNTH_MAX_FREQ)
+ 		rate = SI5351_MULTISYNTH_MAX_FREQ;
+ 	if (rate < SI5351_MULTISYNTH_MIN_FREQ)
+@@ -681,8 +681,8 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		*parent_rate = a * rate;
+ 	} else if (hwdata->num >= 6) {
+-		/* determine the closest integer divider */
+-		a = DIV_ROUND_CLOSEST(*parent_rate, rate);
++		/* determine the closest even integer divider */
++		a = DIV_ROUND_CLOSEST(*parent_rate/2, rate) * 2;
+ 		if (a < SI5351_MULTISYNTH_A_MIN)
+ 			a = SI5351_MULTISYNTH_A_MIN;
+ 		if (a > SI5351_MULTISYNTH67_A_MAX)
+@@ -715,7 +715,8 @@ static long si5351_msynth_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		b = 0;
+ 		c = 1;
+-		if (rfrac)
++		/* Smallest divider in fractional mode must be > 8 (AN619)! */
++		if (rfrac && (a >= 8))
+ 			rational_best_approximation(rfrac, denom,
+ 			    SI5351_MULTISYNTH_B_MAX, SI5351_MULTISYNTH_C_MAX,
+ 			    &b, &c);
+@@ -1039,11 +1040,11 @@ static long si5351_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		container_of(hw, struct si5351_hw_data, hw);
+ 	unsigned char rdiv;
+ 
+-	/* clkout6/7 can only handle output freqencies < 150MHz */
++	/* clkout6/7 can only handle output frequencies < 150MHz */
+ 	if (hwdata->num >= 6 && rate > SI5351_CLKOUT67_MAX_FREQ)
+ 		rate = SI5351_CLKOUT67_MAX_FREQ;
+ 
+-	/* clkout freqency is 8kHz - 160MHz */
++	/* clkout frequency is 2.5kHz - 200MHz */
+ 	if (rate > SI5351_CLKOUT_MAX_FREQ)
+ 		rate = SI5351_CLKOUT_MAX_FREQ;
+ 	if (rate < SI5351_CLKOUT_MIN_FREQ)
+diff --git a/drivers/clk/clk-si5351.h b/drivers/clk/clk-si5351.h
+index e9e2bfdaa..8f7a25b25 100644
+--- a/drivers/clk/clk-si5351.h
++++ b/drivers/clk/clk-si5351.h
+@@ -13,11 +13,11 @@
+ 
+ #define SI5351_PLL_VCO_MIN			600000000
+ #define SI5351_PLL_VCO_MAX			900000000
+-#define SI5351_MULTISYNTH_MIN_FREQ		1000000
++#define SI5351_MULTISYNTH_MIN_FREQ		300000
+ #define SI5351_MULTISYNTH_DIVBY4_FREQ		150000000
+-#define SI5351_MULTISYNTH_MAX_FREQ		160000000
++#define SI5351_MULTISYNTH_MAX_FREQ		200000000
+ #define SI5351_MULTISYNTH67_MAX_FREQ		SI5351_MULTISYNTH_DIVBY4_FREQ
+-#define SI5351_CLKOUT_MIN_FREQ			8000
++#define SI5351_CLKOUT_MIN_FREQ			2500
+ #define SI5351_CLKOUT_MAX_FREQ			SI5351_MULTISYNTH_MAX_FREQ
+ #define SI5351_CLKOUT67_MAX_FREQ		SI5351_MULTISYNTH67_MAX_FREQ
+ 
+@@ -26,7 +26,7 @@
+ #define SI5351_PLL_B_MAX			(SI5351_PLL_C_MAX-1)
+ #define SI5351_PLL_C_MAX			1048575
+ #define SI5351_MULTISYNTH_A_MIN			6
+-#define SI5351_MULTISYNTH_A_MAX			1800
++#define SI5351_MULTISYNTH_A_MAX			2048
+ #define SI5351_MULTISYNTH67_A_MAX		254
+ #define SI5351_MULTISYNTH_B_MAX			(SI5351_MULTISYNTH_C_MAX-1)
+ #define SI5351_MULTISYNTH_C_MAX			1048575
+-- 
+2.30.2
+

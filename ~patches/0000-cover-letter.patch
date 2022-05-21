@@ -1,0 +1,33 @@
+From 10581442b60259a09aaea19735b0a0860103297b Mon Sep 17 00:00:00 2001
+From: Jens Renner <renner@efe-gmbh.de>
+Date: Wed, 8 Dec 2021 13:12:45 +0100
+Subject: [PATCH v2 0/2] clk: si5351: Add phase offset for clock output
+
+This patch series adds a phase offset feature to the SI5351 clock
+outputs. This is necessary to generate differential clocks or
+arbitrary phase shifts with respect to other clock outputs.
+
+Patch 1 adds the DT documentation to configure the phase offset.
+
+Patch 2 implements the phase offset feature by adding *_set_phase()
+functions to the multisynth and clockout stages.
+
+Tested on a Xilinx Zynq (ARM Cortex-A9) board with Si5351A-B-GT for
+several frequencies and phase offsets.
+
+Changes in v2:
+  - Use vendor-specific DT property silabs,clock-phase
+
+Jens Renner (2):
+  clk: si5351: Add DT property for phase offset
+  clk: si5351: Add clock output phase offset
+
+ .../bindings/clock/silabs,si5351.txt          |  10 +-
+ drivers/clk/clk-si5351.c                      | 234 +++++++++++++++++-
+ drivers/clk/clk-si5351.h                      |   1 +
+ include/linux/platform_data/si5351.h          |   2 +
+ 4 files changed, 243 insertions(+), 4 deletions(-)
+
+-- 
+2.30.2
+
